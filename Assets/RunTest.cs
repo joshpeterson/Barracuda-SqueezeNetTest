@@ -16,7 +16,7 @@ public class RunTest : MonoBehaviour
 	public int inputResolutionY = 224;
 	public int inputResolutionX = 224;
 
-	public bool useGPU = true;
+	public bool useGPU = false;
 	
 	public Text text;
 	public RawImage displayImage;
@@ -32,6 +32,11 @@ public class RunTest : MonoBehaviour
 	private float rawAverageDt;
 	private string output_name = "output_softmax";
 
+	private const int framesToAverage = 50;
+	private int frameNumber = 0;
+	private float accumulatedFrameTime = 0.0f;
+	private float averageFrameTime = 0.0f;
+
 	// Use this for initialization
 	IEnumerator Start ()
 	{
@@ -45,7 +50,7 @@ public class RunTest : MonoBehaviour
 		modelBuilder.Softmax(output_name, model.outputs[0]);
 		modelBuilder.Output(output_name);
 		
-		engine = WorkerFactory.CreateWorker(model, useGPU ? WorkerFactory.Device.GPU : WorkerFactory.Device.CPU);
+		engine = WorkerFactory.CreateWorker(model, useGPU ? WorkerFactory.Device.GPU : WorkerFactory.Device.CSharp);
 		
 		var input = new Tensor(PrepareTextureForInput(inputImage, !useGPU), 3);
 		
@@ -92,7 +97,21 @@ public class RunTest : MonoBehaviour
 				}
 
 				UpdateAverage(end - start);
-				Debug.Log($"frametime = {(end - start)*1000f}ms, average = {averageDt * 1000}ms");
+				var frameTime = (end - start) * 1000f;
+				if (frameNumber == framesToAverage)
+				{
+					averageFrameTime = accumulatedFrameTime / framesToAverage;
+					accumulatedFrameTime = 0;
+					frameNumber = 0;
+				}
+				else
+				{
+					accumulatedFrameTime += frameTime;
+					frameNumber++;
+				}
+
+				text.text += $"\nAverage frame time (last {framesToAverage} frames): {averageFrameTime} ms";
+				Debug.Log($"frametime = {frameTime}ms, average = {averageDt * 1000}ms");
 			
 				
 			}
